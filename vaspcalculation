@@ -1,0 +1,116 @@
+# -----------opt function------------
+# Created by Junfei Ding at 19:55 2020/11/28
+# According to the file name to Create the corresponding the directories
+# and move the file to to the corresponding directories
+# the last is cp the file to POSCAR
+function opt {
+echo '--Create directories'
+echo '--cp files to directories'
+echo '-- cp the file to POSCAR'
+file=`ls`
+for i in $file
+do
+  if [ -f $i ]
+  then
+	echo $i
+  	read -p "--press 1(Other Quit) to create directory: " rr
+  	if [ $rr -eq 1 ]
+  	then
+		if [[ $i == *.* ]]
+		then
+			mkdir ${i%.*}
+			mv $i ${i%.*}
+			cd ${i%.*} 
+			cp $i POSCAR
+			dos2unix POSCAR
+			cd ..
+		fi
+  	else
+  		mkdir ${i}_opt
+		mv $i ${i}_opt
+		cd $i
+		cp $i POSCAR
+		dos2unix POSCAR
+		cd ..
+  	fi
+  else
+    echo "Ok,let's to address the next item"
+  fi
+done
+}
+
+#-------------------potcar function--------
+#According to the POSCAR file to write the POTCAR file
+#Create by Junfei Ding at 19:57 2020/11/28
+# Only use for PBE_54 functional and the POTCAR file locates
+# at /vol-th/home/yaoqiushi/ding/script_ding/pbe54/
+#Get the elements in POSCAR and assigh it to a list
+function potcar {
+dos2unix POSCAR
+echo -n "" > POTCAR
+elements=`gawk 'NR==6{print $0}' POSCAR`
+#Where is the POTCAR file ?
+pot_path="/work/phy-yaoqs/ding/scripts/pbe54"
+for i in ${elements[*]}
+do
+	echo ${i}
+	echo "Writing ${i} POTCAR file to POTCAR"
+	if [ -e ${pot_path}/${i} ]
+	then
+		cat ${pot_path}/${i}/POTCAR >>POTCAR
+	else
+		echo "${pot_path}/${i} doesn't exist,instead we will using ${pot_path}/${i}_sv"
+		if [ -e ${pot_path}/${i}_sv ]
+		then
+			cat ${pot_path}/${i}_sv/POTCAR >>POTCAR
+		else
+			echo "${pot_path}/${i}_sv doesn't exist"
+			echo "You need to create your POTCAR mannually"
+		fi
+	fi
+done
+}
+
+
+#----------------scf function------------
+#Scf calculation.Namely,create scf directory and 
+#copy CONTCAR INCAR POTCAR KPOINTS to scf
+#and modify the INCAR file
+function scf {
+echo "Create the scf directory"
+mkdir scf
+echo "CONTCAR KPOINTS INCAR POTCAR to scf"
+cp CONTCAR KPOINTS INCAR POTCAR  scf
+cd scf
+cp CONTCAR POSCAR
+sleep 2
+echo "INCAR setting is as following:"
+cat INCAR
+echo "Change NSW=0,IBRION=-1 and ISMEAR=-5"
+sed -i -e '/NSW/c\NSW = 0' -e '/IBRION/c\IBRION = -1' -e '/ISMEAR/c\ISMEAR = -5' INCAR
+sleep 2
+cat INCAR
+read -p  "Do you need further vim the INCAR? If so, press 1 other quit : " incar
+if [ $incar -eq 1 ]
+then
+	vim INCAR
+else
+	echo "Ok,quit to modify INCAR."
+fi
+echo "Your POSCAR Lattice, modify your KPOINTS accordingly"
+sleep 2
+cat POSCAR| head -5
+sleep 3
+echo "Your opt KPOINTS is :"
+sleep 2
+cat ../KPOINTS
+read -p  "Press 1 to set yout scf KPOINTS,Other quit: " k
+if [ $k -eq 1 ]
+then
+	vim KPOINTS
+else
+	echo "Nothing to KPOINTS"
+fi 
+ls
+cd ..
+}

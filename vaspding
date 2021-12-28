@@ -1,0 +1,131 @@
+#Junfei Ding's scripts functions
+
+#-------------0.Vaspding-------------
+VaspDing(){
+echo "conv----->check whether the calculation is convergent or not"
+echo "tasktime----->Check Structure calcultion is convergent or not"
+echo "magz----->magnizition"
+echo "elastic-c----->elastic constant"
+}
+
+
+#-------1. calculation's convergence-------
+#Created by Junfei Ding at 17:20 2020.10.03
+conv(){
+#This function is used to check whether the calculation
+#is convergent or not
+
+#find the newest *.log file
+con_file=`ls -t *.log|head -1`
+#Check the NSW=0 or not.
+nsw=`grep 'NSW' INCAR|gawk -F= '{print $2}'`
+echo $nsw
+#1. Check scf or band calcultion is convergent or not
+if [ $nsw -eq 0 ] || [ $nsw = 0 ]
+then
+  echo "Calculation is about the electronical properties"
+  ialgo=`grep 'IALGO' INCAR|gawk -F= '{print $2}'`
+
+  #1.1 Get how many steps the calculation takes
+  if [ $ialgo=38 ]
+  then
+    cal_step=`cat ${con_file}|grep 'DAV:'|tail -1|gawk '{print $2}'`
+  else
+    cal_step=`cat ${con_file}|grep 'RMM:'|tail -1|gawk '{print $2}'`
+  fi
+  
+  #1.2 Get the steps you have set in INCAR file
+  if  grep 'NELM=' INCAR 
+  then
+    ele_step=`grep 'NELM=' INCAR|gawk -F= '{print $2}'`
+  else
+    ele_step=60
+  fi
+
+  #1.3 if the $cal_step is smaller the $ele_step, usually it is convergent
+  if [ $cal_step\<$ele_step ]
+  then
+    echo "Convergent,calculate $cal_step steps"
+  else
+    echo "After $cal_step steps, Electronic Calculation is not convergent."
+    read -p "Enter 1 to submit task,others quit: " sub
+    if [ $sub -eq 1 ]
+    then
+      pwd
+      ls
+      sleep 2
+      vim INCAR
+      read -p "Enter the script name used to submit task: " subname
+      read -p "Enter the CUP cores number: " subcores
+      qsub $subname $subcores
+    fi
+  fi
+# 2. Check Structure calcultion is convergent or not
+else
+  echo "Calculation is about the structural properties"
+  opt_step=`grep "F=" $con_file|tail -1|gawk '{print $1}'`
+  if  grep "reached required" $con_file 
+  then
+    grep "F=" $con_file|tail -1
+  else
+    echo " calculate $opt_step steps, but didn't convergence!"
+    read -p  "Press 1 to continue calculate, others quits: " cho 
+    if [[ $cho -eq 1 ]]
+    then 
+      mv POSCAR POSCAR_${con_file}
+      cp CONTCAR POSCAR
+#      read -p "Enter the script name used to submit task: " subname
+#     read -p "Enter the CUP cores number: " subcores
+#      qsub $subname $subcores
+	read -p "Enter bsub file name: " bsubname
+        bsub ${bsubname}
+    else 
+      echo "Check your task carfully.Good luck!Bye"
+    fi
+  fi
+fi
+}
+
+#-------2. Task Time-----------------------
+#create by Junfei Ding 2019/09/10 11:50 
+tasktime() {
+task_begin=`grep "executed on" OUTCAR|gawk '{print $(NF-1)" " $NF}'|sed 's/\./-/g'`
+task_end=`stat OUTCAR|grep "Modify"|gawk '{print $2 " "$3}'`
+task_begin_s=`date +%s -d "$task_begin"`
+task_end_s=`date +%s -d "$task_end"`
+task_s=$(($task_end_s-$task_begin_s))
+task_h=`echo "scale=5;$task_s/3600"|bc`
+echo "Your task consumes:" $task_s" seconds." "i.e "$task_h "hours"
+}
+
+
+#-------3. Job directory-------------------
+# according to the inputting jobid
+# Created by Junfei Ding 2020/09/13 22:51
+function jobdir { read -p "Enter your job id: " jobid; 
+directory=`scontrol show job ${jobid}| grep "WorkDir"|gawk -F= '{print $2}'`;
+echo ${directory};
+}
+
+# using qstatf + jobid to inquiry the job directory
+function qstatf { directory=`scontrol show job $1| grep "WorkDir"|gawk -F= '{print $2}'`;
+echo $directory;
+}
+
+
+#-------4. Get the magnezition-----------
+function magz {
+#get the first line number of the magnezition
+m1=`grep -n "magnetization (x)" OUTCAR | tail -1 |gawk -F: '{print $1}'`
+#get the last line number of the magnezition
+m2=`grep -n "tot    " OUTCAR | tail -1 |gawk -F: '{print $1}'`
+sed -n "${m1}, ${m2}p" OUTCAR
+}
+
+
+#-------5. Get the elastic constant-----------
+function elastic-c {
+elastic=`grep -n 'TOTAL ELASTIC MODULI (kBar)' OUTCAR|gawk -F: '{print $1}'`
+lastline=`echo $elastic+9|bc`
+sed -n ''$elastic','$lastline'p' OUTCAR
+}
