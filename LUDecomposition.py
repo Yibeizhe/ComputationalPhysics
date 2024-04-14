@@ -23,7 +23,7 @@ def lu_decomposition(A):
     
     return L, U
 if __name__=="__main__":
-    A = np.array([[1, 1, 1], [0, 2, 5], [2, 5, -1]], dtype=float)
+    A = np.array([[3, 2, 1], [2, 3, 1], [1, 2, 3]], dtype=float)
     L, U = lu_decomposition(A)
     print("A matix:\n",A)
     print("Lower matix:\n",L)
